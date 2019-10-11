@@ -11,7 +11,21 @@
 using Price = unsigned long;
 using ValidTime = unsigned long long;
 using Ticket = std::tuple<std::string, Price, ValidTime>;
-using TicketSet = std::set<Ticket>;
+struct TicketComp {
+    bool operator() (const Ticket& r, const Ticket& l) {
+        Price rP = std::get<Price>(r);
+        Price lP = std::get<Price>(l);
+
+        if(rP == lP) {
+            ValidTime rT = std::get<ValidTime>(r);
+            ValidTime lT = std::get<ValidTime>(l);
+
+            return rT >= lT;
+        }
+        return rP < lP;
+    }
+};
+using TicketSet = std::set<Ticket, TicketComp>;
 using StopNameSet = std::unordered_set<std::string>;
 using StopTime = unsigned long; //TODO: change type?
 using Stop = std::pair<const std::string&, StopTime>;
@@ -36,20 +50,7 @@ enum RequestType {
 using ParseResult = std::pair<RequestType, Request>;
 using CountResult = std::variant<StopTime, std::string, bool>; //TODO: change error variant?
 
-struct ticketComp {
-    bool operator() (const Ticket& r, const Ticket& l) {
-        Price rP = std::get<Price>(r);
-        Price lP = std::get<Price>(l);
 
-        if(rP == lP) {
-            ValidTime rT = std::get<ValidTime>(r);
-            ValidTime lT = std::get<ValidTime>(l);
-
-            return rT >= lT;
-        }
-        return rP < lP;
-    }
-};
 
 //region Parsing
 RequestType getRequestType(const std::string& line) {
@@ -290,18 +291,46 @@ std::vector<std::string> selectTickets(const TicketSet& tickets, StopTime totalT
 
 
 int main() {
-    std::string t1("Ticket 1");
-    std::string t2("Ticket 2");
-    std::string t3("Ticket 3");
+    std::string t1("10 min");
+    std::string t2("30 min");
+    std::string t3("60 min");
 
-    Ticket ti1 = std::make_tuple(t1, 4, 4);
-    Ticket ti2 = std::make_tuple(t2, 4, 4);
-    Ticket ti3 = std::make_tuple(t3, 4, 4);
+    Ticket ti1 = std::make_tuple(t1, 2, 10);
+    Ticket ti2 = std::make_tuple(t2, 5, 30);
+    Ticket ti3 = std::make_tuple(t3, 8, 60);
 
     TicketSet ts;
+    ts.insert(ti3);
     ts.insert(ti1);
     ts.insert(ti2);
-    ts.insert(ti3);
+
+    auto res = selectTickets(ts, 20);
+    std::cout << "czas: " << 20 << std::endl;
+    for(auto r: res) {
+        std::cout << r << std::endl;
+    }
+    std::cout << std::endl;
+
+    auto res2 = selectTickets(ts, 45);
+    std::cout << "czas: " << 45 << std::endl;
+    for(auto r: res2) {
+        std::cout << r << std::endl;
+    }
+    std::cout << std::endl;
+
+    auto res3 = selectTickets(ts, 600);
+    std::cout << "czas: " << 600 << std::endl;
+    for(auto r: res3) {
+        std::cout << r << std::endl;
+    }
+    std::cout << std::endl;
+
+    auto res4 = selectTickets(ts, 70);
+    std::cout << "czas: " << 70 << std::endl;
+    for(auto r: res4) {
+        std::cout << r << std::endl;
+    }
+    std::cout << std::endl;
 
     return 0;
 }
