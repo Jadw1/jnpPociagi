@@ -6,6 +6,7 @@
 #include <set>
 #include <variant>
 #include <regex>
+#include <climits>
 
 using Price = unsigned long;
 using ValidTime = unsigned long long;
@@ -34,6 +35,21 @@ enum RequestType {
 
 using ParseResult = std::pair<RequestType, Request>;
 using CountResult = std::variant<StopTime, std::string, bool>; //TODO: change error variant?
+
+struct ticketComp {
+    bool operator() (const Ticket& r, const Ticket& l) {
+        Price rP = std::get<Price>(r);
+        Price lP = std::get<Price>(l);
+
+        if(rP == lP) {
+            ValidTime rT = std::get<ValidTime>(r);
+            ValidTime lT = std::get<ValidTime>(l);
+
+            return rT >= lT;
+        }
+        return rP < lP;
+    }
+};
 
 //region Parsing
 RequestType getRequestType(const std::string& line) {
@@ -209,112 +225,83 @@ CountResult countTime(const Query& tour, const Timetable& timeTable) {
 
     return CountResult(endTime - startTime);
 }
+
+std::vector<std::string> selectTickets(const TicketSet& tickets, StopTime totalTime) {
+    unsigned long long minPrice = ULLONG_MAX;
+
+    std::string ticks[3] = {"", "", ""};
+
+    //tickets are sorted ascending by price
+    for(auto itA = tickets.cbegin(); itA != tickets.cend(); itA++) {
+        unsigned long long currentPriceA = std::get<Price>(*itA);
+        ValidTime currentTimeA = std::get<ValidTime>(*itA);
+
+        if(currentTimeA >= totalTime) {
+            if(currentPriceA <= minPrice) {
+                minPrice = currentPriceA;
+                ticks[0] = std::get<std::string>(*itA);
+                ticks[1] = "";
+                ticks[2] = "";
+            }
+            break; //TODO ?
+        }
+
+        for(auto itB = itA; itB != tickets.cend(); itB++) {
+            unsigned long long currentPriceB = currentPriceA + std::get<Price>(*itB);
+            ValidTime currentTimeB = currentTimeA + std::get<ValidTime>(*itB);
+
+            if(currentTimeB >= totalTime) {
+                if(currentPriceB <= minPrice){
+                    minPrice = currentPriceB;
+                    ticks[0] = std::get<std::string>(*itA);
+                    ticks[1] = std::get<std::string>(*itB);
+                    ticks[2] = "";
+                }
+                break;
+            }
+
+            for(auto itC = itB; itC != tickets.cend(); itC++) {
+                unsigned long long currentPriceC = currentPriceB + std::get<Price>(*itC);
+                ValidTime currentTimeC = currentTimeB + std::get<ValidTime>(*itC);
+
+                if(currentTimeC >= totalTime) {
+                    if(currentPriceC <= minPrice){
+                        minPrice = currentPriceC;
+                        ticks[0] = std::get<std::string>(*itA);
+                        ticks[1] = std::get<std::string>(*itB);
+                        ticks[2] = std::get<std::string>(*itC);
+                    }
+                    break;
+                }
+            }
+        }
+
+    }
+
+    std::vector<std::string> vec;
+    for(const auto& t: ticks) {
+        if(!t.empty())
+            vec.push_back(t);
+    }
+
+    return  vec;
+}
 //endregion
 
 
 int main() {
-    // PARSING TEST
-    /*
-    std::string buffer;
-    std::string debug_enum_array[5] = {"ADD_ROUTE", "ADD_TICKET", "QUERY", "IGNORE", "ERROR"};
+    std::string t1("Ticket 1");
+    std::string t2("Ticket 2");
+    std::string t3("Ticket 3");
 
-    while(std::getline(std::cin, buffer)) {
-        ParseResult parseResult = parseInputLine(buffer);
-        std::cout << debug_enum_array[parseResult.first] << std::endl;
-    }
-    */
+    Ticket ti1 = std::make_tuple(t1, 4, 4);
+    Ticket ti2 = std::make_tuple(t2, 4, 4);
+    Ticket ti3 = std::make_tuple(t3, 4, 4);
 
-    // COUNTING TEST
-
-    StopNameSet names;
-    Route r;
-
-    std::string n1("name1");
-    names.insert(n1);
-    Stop s1 = Stop(n1, 10);
-
-    std::string n2("name2");
-    names.insert(n2);
-    Stop s2 = Stop(n2, 20);
-
-    std::string n3("name3");
-    names.insert(n3);
-    Stop s3 = Stop(n3, 30);
-
-    std::string n4("name4");
-    names.insert(n4);
-    Stop s4 = Stop(n4, 40);
-
-    std::string n5("name5");
-    names.insert(n5);
-    Stop s5 = Stop(n5, 50);
-
-    std::string n6("name6");
-    names.insert(n6);
-    Stop s6 = Stop(n6, 60);
-
-    r.push_back(s1);
-    r.push_back(s2);
-    r.push_back(s3);
-    r.push_back(s4);
-    r.push_back(s5);
-    r.push_back(s6);
-
-
-    std::string na1("line2_1");
-    names.insert(na1);
-    Stop ns1(na1, 15);
-
-    Stop ns2(n4, 40);
-
-    std::string na3("line2_3");
-    names.insert(na3);
-    Stop ns3(na3, 44);
-
-    std::string na4("line2_4");
-    names.insert(na4);
-    Stop ns4(na4, 58);
-
-    Stop ns5(n6, 70);
-
-    Route r2;
-    r2.push_back(ns1);
-    r2.push_back(ns2);
-    r2.push_back(ns3);
-    r2.push_back(ns4);
-    r2.push_back(ns5);
-
-    Timetable tt;
-    tt.insert({3, r});
-    tt.insert({5, r2});
-
-
-    QueryStop ts1("name2", 3);
-    QueryStop ts2("name6", 0);
-    Query tour;
-
-    tour.push_back(ts1);
-    tour.push_back(ts2);
-
-
-    QueryStop nts1("name1", 3);
-    QueryStop nts2("name4", 5);
-    QueryStop nts3("line2_4", 0);
-
-    Query tur2;
-    tur2.push_back(nts1);
-    tur2.push_back(nts2);
-    tur2.push_back(nts3);
-
-
-    auto res2 = countTime(tur2, tt);
-
-    std::cout << res2.index() << std::endl;
-
-    if(res2.index() == 0) {
-        std::cout << std::get<StopTime>(res2);
-    }
-
+    TicketSet ts;
+    ts.insert(ti1);
+    ts.insert(ti2);
+    ts.insert(ti3);
 
     return 0;
 }
