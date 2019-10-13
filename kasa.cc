@@ -227,10 +227,16 @@ CountResult countTime(const Query& tour, const Timetable& timeTable) {
     return CountResult(endTime - startTime);
 }
 
-std::vector<std::string> selectTickets(const TicketSet& tickets, StopTime totalTime) {
+std::vector<std::string&> selectTickets(const TicketSet& tickets, StopTime totalTime) {
+    const uint MAX_TICKETS = 3;
+    std::string empty;
     unsigned long long minPrice = ULLONG_MAX;
 
-    std::string ticks[3] = {"", "", ""};
+    std::string& ticketA = empty;
+    std::string& ticketB = empty;
+    std::string& ticketC = empty;
+
+    //std::string ticks[3] = {"", "", ""};
 
     //tickets are sorted ascending by price
     for(auto itA = tickets.cbegin(); itA != tickets.cend(); itA++) {
@@ -240,11 +246,15 @@ std::vector<std::string> selectTickets(const TicketSet& tickets, StopTime totalT
         if(currentTimeA >= totalTime) {
             if(currentPriceA <= minPrice) {
                 minPrice = currentPriceA;
-                ticks[0] = std::get<std::string>(*itA);
-                ticks[1] = "";
-                ticks[2] = "";
+                //ticks[0] = std::get<std::string>(*itA);
+                //ticks[1] = "";
+                //ticks[2] = "";
+
+                ticketA = std::get<std::string>(*itA);
+                ticketB = empty;
+                ticketC = empty;
             }
-            break; //TODO ?
+            break;
         }
 
         for(auto itB = itA; itB != tickets.cend(); itB++) {
@@ -254,9 +264,13 @@ std::vector<std::string> selectTickets(const TicketSet& tickets, StopTime totalT
             if(currentTimeB >= totalTime) {
                 if(currentPriceB <= minPrice){
                     minPrice = currentPriceB;
-                    ticks[0] = std::get<std::string>(*itA);
-                    ticks[1] = std::get<std::string>(*itB);
-                    ticks[2] = "";
+                    //ticks[0] = std::get<std::string>(*itA);
+                    //ticks[1] = std::get<std::string>(*itB);
+                    //ticks[2] = "";
+
+                    ticketA = std::get<std::string>(*itA);
+                    ticketB = std::get<std::string>(*itB);
+                    ticketC = empty;
                 }
                 break;
             }
@@ -268,9 +282,13 @@ std::vector<std::string> selectTickets(const TicketSet& tickets, StopTime totalT
                 if(currentTimeC >= totalTime) {
                     if(currentPriceC <= minPrice){
                         minPrice = currentPriceC;
-                        ticks[0] = std::get<std::string>(*itA);
-                        ticks[1] = std::get<std::string>(*itB);
-                        ticks[2] = std::get<std::string>(*itC);
+                        //ticks[0] = std::get<std::string>(*itA);
+                        //ticks[1] = std::get<std::string>(*itB);
+                        //ticks[2] = std::get<std::string>(*itC);
+
+                        ticketA = std::get<std::string>(*itA);
+                        ticketB = std::get<std::string>(*itB);
+                        ticketC = std::get<std::string>(*itC);
                     }
                     break;
                 }
@@ -279,13 +297,20 @@ std::vector<std::string> selectTickets(const TicketSet& tickets, StopTime totalT
 
     }
 
-    std::vector<std::string> vec;
-    for(const auto& t: ticks) {
+    std::vector<std::string&> result;
+    /*for(const auto& t: ticks) {
         if(!t.empty())
-            vec.push_back(t);
-    }
+            result.push_back(t);
+    }*/
 
-    return  vec;
+    if(!ticketA.empty())
+        result.push_back(ticketA);
+    if(!ticketB.empty())
+        result.push_back(ticketB);
+    if(!ticketC.empty())
+        result.push_back(ticketC);
+
+    return  result;
 }
 //endregion
 
