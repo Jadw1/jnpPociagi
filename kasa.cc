@@ -79,6 +79,8 @@ namespace {
         NO_RESPONSE,
         ERROR_RESP
     };
+    // Variant returning info about iterating over loop (break loop, TicketIteratingInfo, current ticket name)
+    using LoopWrapperInfo = std::tuple<bool, TicketIteratingInfo, const std::string&>;
     // Variant allowing for containing a response to a valid request.
     using Response = std::variant<std::string, std::vector<std::string>>;
     // A processing result - type of response and a response itself (if request was valid).
@@ -386,20 +388,35 @@ namespace {
         return {updateBestTickets, breakLoop};
     }
 
+    LoopWrapperInfo loopBodyWrapper(StopTime totalTime, SelectedTickets& bestTickets,
+                        unsigned long long& minPrice, const TicketIterator& it, const TicketIteratingInfo& prev,
+                        const std::string& nameA = "", const std::string& nameB = "") {
+        const auto& name = it->first.second;
+
+        auto result = compareTicket(totalTime, it, prev, minPrice);
+        auto updateResult = updateTicketSelectionLoop(result);
+
+        if(updateResult.first) {
+            minPrice = result.second.first;
+            bestTickets.clear();
+            if(!nameA.empty())
+                bestTickets.push_back(nameA);
+            if(!nameB.empty())
+                bestTickets.push_back(nameB);
+            bestTickets.push_back(name);
+        }
+
+        return {updateResult.second, result.second, name};
+    }
+
     void select3rdTicket(const TicketSortedMap& tickets, StopTime totalTime, SelectedTickets& bestTickets,
             unsigned long long& minPrice, const TicketIterator& it, const TicketIteratingInfo& prev,
             const std::string& nameA, const std::string& nameB) {
         for (auto itC = it; itC != tickets.cend(); itC ++) {
-            const auto& name = itC->first.second;
 
-            auto result = compareTicket(totalTime, itC, prev, minPrice);
-            auto updateResult = updateTicketSelectionLoop(result);
+            auto loopInfo = loopBodyWrapper(totalTime, bestTickets, minPrice, itC, prev, nameA, nameB);
 
-            if(updateResult.first) {
-                minPrice = result.second.first;
-                bestTickets = {nameA, nameB, name};
-            }
-            if (updateResult.second) {
+            if(std::get<bool>(loopInfo)) {
                 break;
             }
         }
@@ -409,20 +426,18 @@ namespace {
             unsigned long long& minPrice, const TicketIterator& it, const TicketIteratingInfo& prev,
             const std::string& nameA) {
         for (auto itB = it; itB != tickets.cend(); itB++) {
-            const auto &name = itB->first.second;
 
-            auto result = compareTicket(totalTime, itB, prev, minPrice);
-            auto updateResult = updateTicketSelectionLoop(result);
+            auto loopInfo = loopBodyWrapper(totalTime, bestTickets, minPrice, itB, prev, nameA);
 
-            if(updateResult.first) {
-                minPrice = result.second.first;
-                bestTickets = {nameA, name};
-            }
-            if(updateResult.second) {
+            if(std::get<bool>(loopInfo)) {
                 break;
             }
 
-            select3rdTicket(tickets, totalTime, bestTickets, minPrice, itB, result.second, nameA, name);
+            auto& tii = std::get<TicketIteratingInfo>(loopInfo);
+            const auto& name = std::get<const std::string&>(loopInfo);
+
+
+            select3rdTicket(tickets, totalTime, bestTickets, minPrice, itB, tii, nameA, name);
         }
     }
 
@@ -432,20 +447,16 @@ namespace {
         SelectedTickets bestTickets;
 
         for (auto it = tickets.cbegin(); it != tickets.cend(); it ++) {
-            const auto& name = it->first.second;
+            auto loopInfo = loopBodyWrapper(totalTime, bestTickets, minPrice, it, TicketIteratingInfo(0, 0));
 
-            auto result = compareTicket(totalTime, it, TicketIteratingInfo(0, 0), minPrice);
-            auto updateResult = updateTicketSelectionLoop(result);
-
-            if(updateResult.first) {
-                minPrice = result.second.first;
-                bestTickets = {name};
-            }
-            if (updateResult.second) {
+            if(std::get<bool>(loopInfo)) {
                 break;
             }
 
-            select2ndTicket(tickets, totalTime, bestTickets, minPrice, it, result.second, name);
+            auto& tii = std::get<TicketIteratingInfo>(loopInfo);
+            const auto& name = std::get<const std::string&>(loopInfo);
+
+            select2ndTicket(tickets, totalTime, bestTickets, minPrice, it, tii, name);
         }
 
         return bestTickets;
