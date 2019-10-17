@@ -69,6 +69,8 @@ namespace {
         TOO_EXPENSIVE,
         TOO_SHORT
     };
+    // Information shared between ticket selection iterations.
+    using SelectionLoopInfo = std::tuple<bool, TicketIteratingInfo, const std::string&>;
     // A ticket selection result - ticket set's status and the information about it.
     using TicketSelectionResult = std::pair<TicketStatus, TicketIteratingInfo>;
     // Type of a response to a request (both valid or invalid).
@@ -79,8 +81,6 @@ namespace {
         NO_RESPONSE,
         ERROR_RESP
     };
-    // Variant returning info about iterating over loop (break loop, TicketIteratingInfo, current ticket name)
-    using LoopWrapperInfo = std::tuple<bool, TicketIteratingInfo, const std::string&>;
     // Variant allowing for containing a response to a valid request.
     using Response = std::variant<std::string, std::vector<std::string>>;
     // A processing result - type of response and a response itself (if request was valid).
@@ -388,9 +388,9 @@ namespace {
         return {updateBestTickets, breakLoop};
     }
 
-    LoopWrapperInfo loopBodyWrapper(StopTime totalTime, SelectedTickets& bestTickets,
-                        unsigned long long& minPrice, const TicketIterator& it, const TicketIteratingInfo& prev,
-                        const std::string& nameA = "", const std::string& nameB = "") {
+    SelectionLoopInfo updateSelectionLoopInfo(StopTime totalTime, SelectedTickets& bestTickets,
+            unsigned long long& minPrice, const TicketIterator& it, const TicketIteratingInfo& prev,
+            const std::string& nameA = "", const std::string& nameB = "") {
         const auto& name = it->first.second;
 
         auto result = compareTicket(totalTime, it, prev, minPrice);
@@ -414,7 +414,7 @@ namespace {
             const std::string& nameA, const std::string& nameB) {
         for (auto itC = it; itC != tickets.cend(); itC ++) {
 
-            auto loopInfo = loopBodyWrapper(totalTime, bestTickets, minPrice, itC, prev, nameA, nameB);
+            auto loopInfo = updateSelectionLoopInfo(totalTime, bestTickets, minPrice, itC, prev, nameA, nameB);
 
             if(std::get<bool>(loopInfo)) {
                 break;
@@ -427,7 +427,7 @@ namespace {
             const std::string& nameA) {
         for (auto itB = it; itB != tickets.cend(); itB++) {
 
-            auto loopInfo = loopBodyWrapper(totalTime, bestTickets, minPrice, itB, prev, nameA);
+            auto loopInfo = updateSelectionLoopInfo(totalTime, bestTickets, minPrice, itB, prev, nameA);
 
             if(std::get<bool>(loopInfo)) {
                 break;
@@ -435,7 +435,6 @@ namespace {
 
             auto& tii = std::get<TicketIteratingInfo>(loopInfo);
             const auto& name = std::get<const std::string&>(loopInfo);
-
 
             select3rdTicket(tickets, totalTime, bestTickets, minPrice, itB, tii, nameA, name);
         }
@@ -447,7 +446,7 @@ namespace {
         SelectedTickets bestTickets;
 
         for (auto it = tickets.cbegin(); it != tickets.cend(); it ++) {
-            auto loopInfo = loopBodyWrapper(totalTime, bestTickets, minPrice, it, TicketIteratingInfo(0, 0));
+            auto loopInfo = updateSelectionLoopInfo(totalTime, bestTickets, minPrice, it, TicketIteratingInfo(0, 0));
 
             if(std::get<bool>(loopInfo)) {
                 break;
